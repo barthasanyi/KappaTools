@@ -8,13 +8,16 @@
 
 type ('a, 'annot) link =
   | ANY_FREE
-  | LNK_VALUE of int * 'annot
+  | LNK_VALUE of int * 'annot  (** link_nb * (port_nb * agent_type ) *)
   | LNK_FREE
   | LNK_ANY
   | LNK_SOME
   | LNK_TYPE of 'a * 'a  (** port * agent_type *)
 
 type switching = Linked of int | Freed | Maintained | Erased
+
+type ('a, 'annoted) link_with_switching =
+  ('a, 'annoted) link Loc.annoted * switching
 
 type rule_internal =
   | I_ANY
@@ -27,7 +30,9 @@ type rule_agent = {
   ra_type: int;
   ra_erased: bool;
   ra_ports: ((int, int * int) link Loc.annoted * switching) array;
+      (** link state for each port, even if no link is considered *)
   ra_ints: rule_internal array;
+      (** internal state for each port, even if no internal state is considered, in which case it should be set to `I_ANY` *)
   ra_syntax:
     (((int, int * int) link Loc.annoted * switching) array
     * rule_internal array)

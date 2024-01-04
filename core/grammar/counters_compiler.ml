@@ -356,7 +356,7 @@ let split_counter_variables_into_separate_rules ~warning rules signatures =
           update_opt_rate counter_var_values r2 )
   in
 
-  (* TODO [split_for_each_counter_var_value_rule] rule evalues to a list of rules with their names *)
+  (* [split_for_each_counter_var_value_rule] rule evaluates for the rule in argument to a list of new rules set according to the value of a counter matching the value of a variable. This replaces tests of equality between a counter value and a variable with tests of equality between a counter value and integers in the counter value range *)
   let split_for_each_counter_var_value_rule
       (rule_name : string Loc.annoted option)
       ((rule, annot) : Ast.rule Loc.annoted) :
@@ -471,49 +471,29 @@ let split_counter_variables_into_separate_rules ~warning ~debug_mode
   );
   { compil with Ast.rules }
 
-let make_counter_agent sigs (is_first, (dst, ra_erased)) (is_last, equal) i j
-    loc (created : bool) : LKappa.rule_agent =
+let make_rule_counter_agent sigs noted_as_erased link_with_switching_before
+    link_with_switching_after loc : LKappa.rule_agent =
   let counter_agent_info = Signature.get_counter_agent_info sigs in
   let port_b, port_a = counter_agent_info.ports in
   let ra_type = counter_agent_info.id in
 
   let ra_ports =
     Array.make counter_agent_info.arity
-      ((LKappa.LNK_FREE, loc), LKappa.Maintained)
+      (LKappa.LNK_FREE |> Loc.annotate loc, LKappa.Maintained)
   in
-  let before_switch =
-    if is_first && created then
-      LKappa.Linked i
-    else
-      LKappa.Maintained
-  in
-  let before =
-    if is_first then
-      LKappa.LNK_VALUE (i, dst), loc
-    else
-      LKappa.LNK_VALUE (i, (ra_type, port_a)), loc
-  in
-  let () = ra_ports.(port_b) <- before, before_switch in
-  let after =
-    if is_last && equal then
-      LKappa.LNK_FREE, loc
-    else if is_last then
-      LKappa.LNK_ANY, loc
-    else
-      LKappa.LNK_VALUE (j, (ra_type, port_b)), loc
-  in
-  let () = ra_ports.(port_a) <- after, LKappa.Maintained in
+  ra_ports.(port_b) <- link_with_switching_before;
+  ra_ports.(port_a) <- link_with_switching_after;
   let ra_ints = Array.make counter_agent_info.arity LKappa.I_ANY in
   {
     LKappa.ra_type;
-    ra_erased;
+    ra_erased = noted_as_erased;
     ra_ports;
     ra_ints;
     ra_syntax = Some (Array.copy ra_ports, Array.copy ra_ints);
   }
 
-let raw_counter_agent (is_first, first_link) (is_last, last_link) i j sigs equal
-    : Raw_mixture.agent =
+let make_raw_counter_agent (link_before : Raw_mixture.link)
+    (link_after : Raw_mixture.link) (sigs : Signature.s) : Raw_mixture.agent =
   let counter_agent_info = Signature.get_counter_agent_info sigs in
   let port_b, port_a = counter_agent_info.ports in
   let ports = Array.make counter_agent_info.arity Raw_mixture.FREE in
@@ -521,83 +501,129 @@ let raw_counter_agent (is_first, first_link) (is_last, last_link) i j sigs equal
     Array.init counter_agent_info.arity (fun i ->
         Signature.default_internal_state counter_agent_info.id i sigs)
   in
-  let before =
-    if is_first then
-      Raw_mixture.VAL first_link
-    else
-      Raw_mixture.VAL i
-  in
-  let () = ports.(port_b) <- before in
-  let after =
-    if is_last && equal then
-      Raw_mixture.FREE
-    else if is_last then
-      Raw_mixture.VAL last_link
-    else
-      Raw_mixture.VAL j
-  in
-  let () = ports.(port_a) <- after in
+  ports.(port_b) <- link_before;
+  ports.(port_a) <- link_after;
   {
     Raw_mixture.a_type = counter_agent_info.id;
     Raw_mixture.a_ports = ports;
     Raw_mixture.a_ints = internals;
   }
 
-let rec add_incr (i : int) (first_link : int) (last_link : int) (delta : int)
-    (equal : bool) (sigs : Signature.s) : Raw_mixture.agent list =
-  if i = delta then
-    []
-  else (
-    let is_first = i = 0 in
-    let is_last = i = delta - 1 in
-    let raw_incr =
-      raw_counter_agent (is_first, first_link) (is_last, last_link)
-        (first_link + i)
-        (first_link + i + 1)
-        sigs equal
-    in
-    raw_incr :: add_incr (i + 1) first_link last_link delta equal sigs
-  )
+let make_rule_agent_counter_test_chain (sigs : Signature.s) (nb : int)
+    (first_link_type : int * int) (noted_as_erased : bool)
+    (test_is_equality : bool) (link : int) (loc : Loc.t) (delta : int) :
+    LKappa.rule_mixture =
+  let counter_agent_info = Signature.get_counter_agent_info sigs in
+  let port_b, port_a = counter_agent_info.ports in
+  let ra_type = counter_agent_info.id in
 
-let rec link_incr (sigs : Signature.s) (i : int) (nb : int)
-    (ag_info : (int * int) * bool) (equal : bool) (link : int) (loc : Loc.t)
-    (delta : int) : LKappa.rule_mixture =
-  if i = nb then
-    []
-  else (
-    let is_first = i = 0 in
-    let is_last = i = nb - 1 in
-    let ra_agent =
-      make_counter_agent sigs (is_first, ag_info) (is_last, equal) (link + i)
-        (link + i + 1)
-        loc (delta > 0)
-    in
-    ra_agent :: link_incr sigs (i + 1) nb ag_info equal link loc delta
-  )
+  let rec aux (i : int) =
+    if i = nb + 1 then
+      []
+    else (
+      let is_first = i = 0 in
+      let is_last = i = nb in
 
-let rec erase_incr (sigs : Signature.s) (i : int) (incrs : LKappa.rule_mixture)
-    (delta : int) (link : int) : LKappa.rule_mixture =
+      let link_type_before : int * int =
+        if is_first then
+          first_link_type
+        else
+          (* TODO *)
+          (*           port_a, ra_type *)
+          ra_type, port_a
+      in
+      let link_before : (int, int * int) LKappa.link Loc.annoted =
+        LKappa.LNK_VALUE (link + i, link_type_before) |> Loc.annotate loc
+      in
+      let link_switching_before : LKappa.switching =
+        if is_first && delta > 0 then
+          (* TODO comment: delta > 0 testing for created *)
+          LKappa.Linked (link + i)
+        else
+          LKappa.Maintained
+      in
+      let link_after : (int, int * int) LKappa.link Loc.annoted =
+        (if is_last && test_is_equality then
+           LKappa.LNK_FREE
+         else if is_last then
+           LKappa.LNK_ANY
+         else
+           (* TODO *)
+           (*            LKappa.LNK_VALUE (link + i + 1, (port_b, ra_type))) *)
+           LKappa.LNK_VALUE (link + i + 1, (ra_type, port_b)))
+        |> Loc.annotate loc
+      in
+
+      let ra_agent =
+        make_rule_counter_agent sigs noted_as_erased
+          (link_before, link_switching_before)
+          (link_after, LKappa.Maintained)
+          loc
+      in
+      ra_agent :: aux (i + 1)
+    )
+  in
+  aux 0
+
+let make_new_raw_counter_agents_in_chain (first_link : int)
+    (last_link_nb_opt : int option) (delta : int) (sigs : Signature.s) :
+    Raw_mixture.agent list =
+  let rec aux (i : int) =
+    if i = delta then
+      []
+    else (
+      let is_first = i = 0 in
+      let is_last = i = delta - 1 in
+
+      let link_before =
+        if is_first then
+          Raw_mixture.VAL first_link
+        else
+          Raw_mixture.VAL (first_link + i)
+      in
+      let link_after =
+        if is_last then (
+          match last_link_nb_opt with
+          | None -> Raw_mixture.FREE
+          | Some last_link_nb -> Raw_mixture.VAL last_link_nb
+        ) else
+          Raw_mixture.VAL (first_link + i + 1)
+      in
+      let raw_incr = make_raw_counter_agent link_before link_after sigs in
+      raw_incr :: aux (i + 1)
+    )
+  in
+  aux 0
+
+let set_erased_rule_counter_agents_in_chain (sigs : Signature.s)
+    (incrs : LKappa.rule_mixture) (delta : int) (link : int) :
+    LKappa.rule_mixture =
   let counter_agent_info = Signature.get_counter_agent_info sigs in
   let port_b = fst counter_agent_info.ports in
-  match incrs with
-  | incr :: incr_s ->
-    if i = abs delta then (
-      let before, _ = incr.LKappa.ra_ports.(port_b) in
-      incr.LKappa.ra_ports.(port_b) <- before, LKappa.Linked link;
-      incr :: incr_s
-    ) else (
-      Array.iteri
-        (fun i (a, _) -> incr.LKappa.ra_ports.(i) <- a, LKappa.Erased)
-        incr.LKappa.ra_ports;
-      let rule_agent = { incr with LKappa.ra_erased = true } in
-      rule_agent :: erase_incr sigs (i + 1) incr_s delta link
-    )
-  | [] -> []
+  let rec aux (i : int) (incr_l : LKappa.rule_agent list) =
+    match incr_l with
+    | incr :: incr_s ->
+      if i < abs delta then (
+        (* Erase agent: we erase [delta] agents at the start of the chain *)
+        Array.iteri
+          (fun i (a, _) -> incr.LKappa.ra_ports.(i) <- a, LKappa.Erased)
+          incr.LKappa.ra_ports;
+        let rule_agent = { incr with LKappa.ra_erased = true } in
+        rule_agent :: aux (i + 1) incr_s
+      ) else (
+        (* Link first agent from the remaining of the chain back to the first link *)
+        let before_link, _ = incr.LKappa.ra_ports.(port_b) in
+        incr.LKappa.ra_ports.(port_b) <- before_link, LKappa.Linked link;
+        incr :: incr_s
+      )
+    | [] -> []
+  in
+  aux 0 incrs
 
 (** Returns mixtures for agent with site changed from counter to port, as well as new [link_nb] after previous additions
  * Used by [compile_counter_in_rule_agent]*)
 let counter_becomes_port (sigs : Signature.s) (ra : LKappa.rule_agent)
-    (p_id : int) (counter : Ast.counter) (start_link_nb : int) :
+    (port_id : int) (counter : Ast.counter) (start_link_nb : int) :
     (LKappa.rule_mixture * Raw_mixture.t) * int =
   (* Returns positive part of value *)
   let positive_part (i : int) : int =
@@ -619,7 +645,7 @@ let counter_becomes_port (sigs : Signature.s) (ra : LKappa.rule_agent)
              loc ))
       counter.Ast.counter_test
   in
-  let (test, equal) : int * bool =
+  let (test_value, test_is_equality) : int * bool =
     match Loc.v counter_test with
     | Ast.CVAR _ ->
       raise
@@ -631,35 +657,54 @@ let counter_becomes_port (sigs : Signature.s) (ra : LKappa.rule_agent)
              Loc.get_annot counter_test ))
     | Ast.CEQ j -> j, true
     | Ast.CGTE j -> j, false
-    | Ast.CLTE _j -> failwith "not implemented" (* TODO now *)
-  in
-  let start_link_for_created : int = start_link_nb + test + 1 in
-  let link_for_erased : int = start_link_nb + abs delta in
-  let ag_info : (int * int) * bool =
-    (p_id, ra.LKappa.ra_type), ra.LKappa.ra_erased
+    | Ast.CLTE _j -> failwith "not implemented" (* TODO *)
   in
 
-  let test_incr : LKappa.rule_mixture =
-    link_incr sigs 0 (test + 1) ag_info equal start_link_nb loc delta
+  (* There are two kinds of mixtures specified here in the rule: rule mixture and raw mixture.
+   * Operations done to change the counter to a chain of agents:
+   * - Add the test in the rule mixture as test in the chain of agent
+   * - If delta < 0, remove agents in the rule mixture by setting them as Erased
+   * - If delta > 0, add agents in the raw mixture *)
+
+  (* Add test condition of counter value in rule_mixture:
+   * specify counter agents that should be present and link value in the end of the chain *)
+  (* TODO *)
+  let first_link_type : int * int = port_id, ra.LKappa.ra_type in
+  let rule_mix_with_counter_test : LKappa.rule_mixture =
+    make_rule_agent_counter_test_chain sigs test_value first_link_type
+      ra.LKappa.ra_erased test_is_equality start_link_nb loc delta
   in
-  let adjust_delta : LKappa.rule_mixture =
+
+  (* TODO: clarify why these link numbers *)
+  let link_for_erased : int = start_link_nb + abs delta in
+  let start_link_for_created : int = start_link_nb + test_value + 1 in
+  let new_link_nb : int =
+    start_link_nb + 1 + test_value + positive_part delta
+  in
+  (* Adjust delta in counter value:
+   * - if delta < 0 set them as erased in the rule mixture
+   * - if delta > 0 add them in the raw mixture *)
+  let rule_mix_with_counter_test_and_delta : LKappa.rule_mixture =
     if delta < 0 then
-      erase_incr sigs 0 test_incr delta link_for_erased
+      set_erased_rule_counter_agents_in_chain sigs rule_mix_with_counter_test
+        delta link_for_erased
     else
-      test_incr
+      rule_mix_with_counter_test
   in
-  let created : Raw_mixture.t =
+  let raw_mix_with_counter_delta : Raw_mixture.t =
     if delta > 0 then
-      add_incr 0 start_link_for_created start_link_nb delta false sigs
+      make_new_raw_counter_agents_in_chain start_link_for_created
+        (Some start_link_nb) delta sigs
     else
       []
   in
 
-  if test + delta < 0 then
+  if test_value + delta < 0 then
     raise
       (ExceptionDefn.Internal_Error
          ("Counter test should be greater then abs(delta)", loc_delta));
 
+  (* Update link to the rule agent with the counter *)
   let switch : LKappa.switching =
     if delta = 0 then
       LKappa.Maintained
@@ -670,12 +715,14 @@ let counter_becomes_port (sigs : Signature.s) (ra : LKappa.rule_agent)
   in
   let counter_agent_info = Signature.get_counter_agent_info sigs in
   let port_b : int = fst counter_agent_info.ports in
-  ra.LKappa.ra_ports.(p_id) <-
+  ra.LKappa.ra_ports.(port_id) <-
     ( (LKappa.LNK_VALUE (start_link_nb, (port_b, counter_agent_info.id)), loc),
       switch );
-  let new_link_nb : int = start_link_nb + 1 + test + positive_part delta in
 
-  (adjust_delta, created), new_link_nb
+  ( (rule_mix_with_counter_test_and_delta, raw_mix_with_counter_delta),
+    new_link_nb )
+
+(* TODO: fixes this comment as it also applies the delta to the counter *)
 
 (** Compiles the counter precondition in a left hand side mixture of a rule into a mixture which tests dummy positions
  * rule_agent_ - agent with counters in a rule
@@ -710,7 +757,7 @@ let compile_counter_in_raw_agent (sigs : Signature.s)
   let raw_agent : Raw_mixture.agent = raw_agent_.agent in
   let ports : Raw_mixture.link array = raw_agent.Raw_mixture.a_ports in
   Tools.array_fold_lefti
-    (fun p_id (acc, lnk_nb) -> function
+    (fun port_id (acc, lnk_nb) -> function
       | None -> acc, lnk_nb
       | Some (c, _) ->
         (match c.Ast.counter_test with
@@ -734,8 +781,10 @@ let compile_counter_in_raw_agent (sigs : Signature.s)
               agent_name c.Ast.counter_name
           | Ast.CEQ j ->
             let p = Raw_mixture.VAL lnk_nb in
-            let () = ports.(p_id) <- p in
-            let incrs = add_incr 0 lnk_nb (lnk_nb + j) (j + 1) true sigs in
+            let () = ports.(port_id) <- p in
+            let incrs =
+              make_new_raw_counter_agents_in_chain lnk_nb None (j + 1) sigs
+            in
             acc @ incrs, lnk_nb + j + 1)))
     ([], lnk_nb) raw_agent_.counters
 
@@ -825,7 +874,8 @@ let rule_agent_with_max_counter sigs c ((agent_name, _) as ag_ty) :
   let max_val, loc = c.Ast.counter_delta in
   let max_val' = max_val + 1 in
   let incrs =
-    link_incr sigs 0 (max_val' + 1) ((c_id, ag_id), false) false 1 loc (-1)
+    make_rule_agent_counter_test_chain sigs max_val' (c_id, ag_id) false false 1
+      loc (-1)
   in
   let counter_agent_info = Signature.get_counter_agent_info sigs in
   let port_b = fst counter_agent_info.ports in
@@ -905,13 +955,13 @@ let annotate_dropped_counters sign ast_counters ra arity agent_name aux =
     List.fold_left
       (fun pset c ->
         let port_name = c.Ast.counter_name in
-        let p_id = Signature.num_of_site ~agent_name port_name sign in
+        let port_id = Signature.num_of_site ~agent_name port_name sign in
         let () =
-          match Signature.counter_of_site_id p_id sign with
+          match Signature.counter_of_site_id port_id sign with
           | None -> LKappa.raise_counter_misused agent_name c.Ast.counter_name
           | Some _ -> ()
         in
-        let pset' = Mods.IntSet.add p_id pset in
+        let pset' = Mods.IntSet.add port_id pset in
         let () =
           if pset == pset' then
             LKappa.raise_several_occurence_of_site agent_name c.Ast.counter_name
@@ -919,10 +969,10 @@ let annotate_dropped_counters sign ast_counters ra arity agent_name aux =
         let () = raise_if_modification c.Ast.counter_delta in
         let () =
           match aux with
-          | Some f -> f p_id
+          | Some f -> f port_id
           | None -> ()
         in
-        ra_counters.(p_id) <- Some (c, LKappa.Erased);
+        ra_counters.(port_id) <- Some (c, LKappa.Erased);
         pset')
       Mods.IntSet.empty ast_counters
   in
@@ -943,19 +993,19 @@ let annotate_edit_counters sigs ((agent_name, _) as ag_ty) counters ra
     List.fold_left
       (fun pset c ->
         let port_name = c.Ast.counter_name in
-        let p_id = Signature.num_of_site ~agent_name port_name sign in
+        let port_id = Signature.num_of_site ~agent_name port_name sign in
         let () =
-          match Signature.counter_of_site_id p_id sign with
+          match Signature.counter_of_site_id port_id sign with
           | None -> LKappa.raise_counter_misused agent_name c.Ast.counter_name
           | Some _ -> ()
         in
-        let pset' = Mods.IntSet.add p_id pset in
+        let pset' = Mods.IntSet.add port_id pset in
         let () =
           if pset == pset' then
             LKappa.raise_several_occurence_of_site agent_name c.Ast.counter_name
         in
-        let () = register_counter_modif p_id in
-        let () = ra_counters.(p_id) <- Some (c, LKappa.Maintained) in
+        let () = register_counter_modif port_id in
+        let () = ra_counters.(port_id) <- Some (c, LKappa.Maintained) in
         pset')
       Mods.IntSet.empty counters
   in
@@ -1019,17 +1069,17 @@ let annotate_created_counters sigs ((agent_name, _) as ag_ty) counters
 
   (* register all counters (specified or not) with min value *)
   Array.iteri
-    (fun p_id _ ->
-      match Signature.counter_of_site_id p_id sign with
+    (fun port_id _ ->
+      match Signature.counter_of_site_id port_id sign with
       | Some (min, _) ->
-        let c_name = Signature.site_of_num p_id sign in
+        let c_name = Signature.site_of_num port_id sign in
         (try
            let c =
              List.find
                (fun c' -> String.compare (Loc.v c'.Ast.counter_name) c_name = 0)
                counters
            in
-           ra_counters.(p_id) <-
+           ra_counters.(port_id) <-
              Some
                ( {
                    Ast.counter_name = c.Ast.counter_name;
@@ -1038,7 +1088,7 @@ let annotate_created_counters sigs ((agent_name, _) as ag_ty) counters
                  },
                  LKappa.Maintained )
          with Not_found ->
-           ra_counters.(p_id) <-
+           ra_counters.(port_id) <-
              Some
                ( {
                    Ast.counter_name = c_name, Loc.dummy;
@@ -1058,16 +1108,16 @@ let annotate_created_counters sigs ((agent_name, _) as ag_ty) counters
     List.fold_left
       (fun pset c ->
         let port_name = c.Ast.counter_name in
-        let p_id = Signature.num_of_site ~agent_name port_name sign in
-        match Signature.counter_of_site_id p_id sign with
+        let port_id = Signature.num_of_site ~agent_name port_name sign in
+        match Signature.counter_of_site_id port_id sign with
         | None -> LKappa.raise_counter_misused agent_name c.Ast.counter_name
         | Some _ ->
           ();
-          let pset' = Mods.IntSet.add p_id pset in
+          let pset' = Mods.IntSet.add port_id pset in
           if pset == pset' then
             LKappa.raise_several_occurence_of_site agent_name c.Ast.counter_name;
-          register_counter_modif p_id;
-          ra_counters.(p_id) <- Some (c, LKappa.Maintained);
+          register_counter_modif port_id;
+          ra_counters.(port_id) <- Some (c, LKappa.Maintained);
           pset')
       Mods.IntSet.empty counters
   in

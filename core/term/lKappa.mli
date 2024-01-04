@@ -11,12 +11,16 @@
 type ('a, 'annoted) link =
   | ANY_FREE
   | LNK_VALUE of int * 'annoted
+      (** link_nb * (port * agent_type) when 'annoted is int * int *)
   | LNK_FREE
   | LNK_ANY
   | LNK_SOME
   | LNK_TYPE of 'a * 'a  (** port * agent_type *)
 
 type switching = Linked of int | Freed | Maintained | Erased
+
+type ('a, 'annoted) link_with_switching =
+  ('a, 'annoted) link Loc.annoted * switching
 
 type rule_internal =
   (* internal state of agent port *)
@@ -29,13 +33,11 @@ type rule_internal =
 type rule_agent = {
   ra_type: int; (*agent_id*)
   ra_erased: bool;
-  ra_ports: ((int, int * int) link Loc.annoted * switching) array;
+  ra_ports: (int, int * int) link_with_switching array;
   (*((link nb, (dst_site,dst_ag_type)), _) , switch*)
   ra_ints: rule_internal array;
   ra_syntax:
-    (((int, int * int) link Loc.annoted * switching) array
-    * rule_internal array)
-    option;
+    ((int, int * int) link_with_switching array * rule_internal array) option;
 }
 (** A representation of 'left-hand-side' agent that stores how
  everything is transformed. In an observable (a mixture in an alg_expr),

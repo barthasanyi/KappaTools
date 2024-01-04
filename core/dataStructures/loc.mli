@@ -25,6 +25,9 @@ val copy_annot : 'b annoted -> 'a -> 'a annoted
 val map_annot : ('a -> 'b) -> 'a annoted -> 'b annoted
 (** Apply operation on variable and keep annotation *)
 
+val annotate : t -> 'a -> 'a annoted
+(** Annotate variable with annotation *)
+
 val of_pos : Lexing.position -> Lexing.position -> t
 val dummy : t
 val annot_with_dummy : 'a -> 'a annoted
