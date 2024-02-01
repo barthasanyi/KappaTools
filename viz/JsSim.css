@@ -224,8 +224,8 @@ rect { stroke-width: 2; }
 
 
 #cycleCheckbox + label {
-  margin-left:5px;
-  margin-right:5px;
+  margin-left:15px;
+  margin-right:15px;
 }
 
 #toggleLines + label {
@@ -252,17 +252,50 @@ form {
     margin-left: 10px;
 }
 
+/* Used for legend controls below the graph */
+.form-inline {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+
+  /* Margin around the check boxes and labels  */
+  .form-check {
+    margin: 0px 10px;
+  }
+  .form-check-label {
+    margin: 0px 10px;
+  }
+  /* Margin around the X axis selector */
+  .form-group {
+  }
+  .form-select-label {
+    margin: 0px 10px;
+  }
+
+}
+
+.navcontent-controls {
+  display: flex
+    flex-flow: row nowrap;
+    align-items: center;
+    justify-content: flex-start;
+  .form-group {
+    margin: 0px 0px;
+  }
+}
+
 .nodeTextArc {
     fill: none;
     stroke: transparent;
 }
 .snap-tooltip {
-    position: absolute;			
-    text-align: right;		
+    position: absolute;
+    text-align: right;
     white-space: pre;
     bottom: 0;
     right: 0;
-    pointer-events: none;	
+    pointer-events: none;
 }
 
 .tooltip {
@@ -272,7 +305,7 @@ form {
     white-space: pre;
     text-align: right;
     background-color: white;
-    pointer-events: none;	
+    pointer-events: none;
 }
 
 #plot-display {

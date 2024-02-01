@@ -489,6 +489,8 @@ function ObservablePlot (mainDivId) {
 		// Clear div first
 		var divAxisSelect = d3.select("#"+that.plotDivAxisSelectId);
 		divAxisSelect.html("");
+    divAxisSelect.append("label").attr("class", "form-select-label").attr("for",that.plotDivAxisSelectId).text("Change X axis");
+
 		/* Handler to update when the select changes */
 		var changeHandler = function(){
                     var index = parseInt(this.options[this.selectedIndex].value);
@@ -580,26 +582,28 @@ function ObservablePlot (mainDivId) {
 	var mainDiv = d3.select("#"+mainDivId);
 	mainDiv.append("div").attr("id",this.plotLabelDiv).html("Plot");
 	mainDiv.append("div").attr("id",that.plotDivId).attr("class","flex-content");
+
+
 	var legendForm = mainDiv.append("form").attr("id","plot-legend-div").attr("class","form-inline");
-	var showLegendDiv = legendForm.append("div").attr("class","checkbox").append("label");
-	showLegendDiv.append("input").attr("type","checkbox")
+	var showLegendDiv = legendForm.append("div").attr("class","form-check mb-2 mr-sm-2");
+	showLegendDiv.append("input").attr("type","checkbox").attr("class", "form-check-input")
 	    .attr("checked","true").on("change",function () {
 		that.setShowLegend(d3.event.currentTarget.checked);
 		that.redraw();
 	    });
-	showLegendDiv.append("span").text(" Legend");
-	var logXDiv = legendForm.append("div").attr("class","checkbox").append("label");
-	logXDiv.text("Log X ");
-	logXDiv.append("input").attr("type","checkbox").on("change",function () {
+	showLegendDiv.append("label").attr("class", "form-check-label").attr("for", "inline-form-check").text("Show legend" );
+	var logXDiv = legendForm.append("div").attr("class","form-check mb-2 mr-sm-2");
+	logXDiv.append("input").attr("type","checkbox").attr("class", "form-check-input").on("change",function () {
 		that.setXAxisLog(d3.event.currentTarget.checked);
 		that.redraw();
-	    });;
-	var logYDiv = legendForm.append("div").attr("class","checkbox").append("label");
-	logYDiv.text("Log Y ");
-	logYDiv.append("input").attr("type","checkbox").on("change",function () {
+	    });
+	logXDiv.append("label").attr("class", "form-check-label").attr("for", "inline-form-check").text("Apply log on axis X ");
+	var logYDiv = legendForm.append("div").attr("class", "form-check mb-2 mr-sm-2");
+	logYDiv.append("input").attr("type","checkbox").attr("class", "form-check-input").on("change",function () {
 		that.setYAxisLog(d3.event.currentTarget.checked);
 		that.redraw();
-	    });;
+	    });
+	logYDiv.append("label").attr("class", "form-check-label").attr("for", "inline-form-check").text("Apply log on axis Y ");
 	legendForm.append("div").attr("id",that.plotDivAxisSelectId).attr("class","form-group")
 	    .append("select").attr("class","form-control");
     };
