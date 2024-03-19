@@ -60,7 +60,7 @@
    logs
    kappa-library
    atdgen-runtime
-   (atdgen (= build))
+   atdgen ; TODO: find a way to specify as build dependency only, as with the `build` package variable in opam
    )
 )
 
@@ -79,6 +79,6 @@
    kappa-agents
    cohttp-lwt-unix
    atdgen-runtime
-   (atdgen (= build))
+   atdgen ; TODO: find a way to specify as build dependency only, as with the `build` package variable in opam
    )
 )

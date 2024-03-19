@@ -31,7 +31,7 @@ depends: [
   "logs"
   "kappa-library"
   "atdgen-runtime"
-  "atdgen" {= "build"}
+  "atdgen"
   "odoc" {with-doc}
 ]
 build: [

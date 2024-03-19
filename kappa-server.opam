@@ -33,7 +33,7 @@ depends: [
   "kappa-agents"
   "cohttp-lwt-unix"
   "atdgen-runtime"
-  "atdgen" {= "build"}
+  "atdgen"
   "odoc" {with-doc}
 ]
 build: [
