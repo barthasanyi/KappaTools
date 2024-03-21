@@ -75,158 +75,159 @@ let content () =
   ]
 
 let init_dead_rules () =
-  React.S.l1
-    (fun model ->
+  State_project.on_project_change_async ~on:(React.S.const true)
+    (React.S.const ()) (Result_util.ok ()) (fun manager () ->
       State_error.wrap ~append:true "tab_editor_dead_rule"
-        (State_project.eval_with_project ~label:__LOC__
-           (fun (manager : Api.concrete_manager) ->
-             if
-               model.State_project.model_parameters
-                 .State_project.show_dead_rules
-             then
-               manager#get_dead_rules
-               >|= Result_util.fold
-                     ~ok:(fun list ->
-                       let warnings =
-                         List.fold_left
-                           (fun acc rule ->
-                             if rule.Public_data.rule_hidden then
-                               acc
-                             else (
-                               let text =
-                                 "Dead rule "
-                                 ^
-                                 if rule.Public_data.rule_label <> "" then
-                                   " '" ^ rule.Public_data.rule_label ^ "'"
-                                 else if rule.Public_data.rule_ast <> "" then
-                                   rule.Public_data.rule_ast
-                                 else
-                                   string_of_int rule.Public_data.rule_id
-                               in
-                               {
-                                 Result_util.severity = Logs.Warning;
-                                 Result_util.range =
-                                   Some rule.Public_data.rule_position;
-                                 Result_util.text;
-                               }
-                               :: acc
-                             ))
-                           [] list
-                       in
-                       List.rev warnings)
-                     ~error:(fun mh -> mh)
-               >|= Api_common.result_messages ?result_code:None
-             else
-               Lwt.return (Result_util.ok ()))))
-    State_project.model
+        (if
+           (*model.State_project.model_parameters
+             .State_project.show_dead_rules*)
+           true
+         then
+           manager#get_dead_rules
+           >|= Result_util.fold
+                 ~ok:(fun list ->
+                   let warnings =
+                     List.fold_left
+                       (fun acc rule ->
+                         if rule.Public_data.rule_hidden then
+                           acc
+                         else (
+                           let text =
+                             "Dead rule "
+                             ^
+                             if rule.Public_data.rule_label <> "" then
+                               " '" ^ rule.Public_data.rule_label ^ "'"
+                             else if rule.Public_data.rule_ast <> "" then
+                               rule.Public_data.rule_ast
+                             else
+                               string_of_int rule.Public_data.rule_id
+                           in
+                           {
+                             Result_util.severity = Logs.Warning;
+                             Result_util.range =
+                               Some rule.Public_data.rule_position;
+                             Result_util.text;
+                           }
+                           :: acc
+                         ))
+                       [] list
+                   in
+                   List.rev warnings)
+                 ~error:(fun mh -> mh)
+           >|= Api_common.result_messages ?result_code:None
+         else
+           Lwt.return (Result_util.ok ())))
 
 let init_dead_agents () =
-  React.S.l1
-    (fun model ->
+  State_project.on_project_change_async ~on:(React.S.const true)
+    (React.S.const ()) (Result_util.ok ()) (fun manager () ->
       State_error.wrap ~append:true "tab_editor_dead_agent"
-        (State_project.eval_with_project ~label:__LOC__
-           (fun (manager : Api.concrete_manager) ->
-             if
-               model.State_project.model_parameters
-                 .State_project.show_dead_agents
-             then
-               manager#get_dead_agents
-               >|= Result_util.fold
-                     ~ok:(fun list ->
-                       let warnings =
+        (if
+           (*model.State_project.model_parameters
+             .State_project.show_dead_agents*)
+           true
+         then
+           manager#get_dead_agents
+           >|= Result_util.fold
+                 ~ok:(fun list ->
+                   let warnings =
+                     List.fold_left
+                       (fun acc agent ->
+                         let text =
+                           "Dead agent "
+                           ^
+                           if agent.Public_data.agent_ast <> "" then
+                             agent.Public_data.agent_ast
+                           else
+                             string_of_int agent.Public_data.agent_id
+                         in
                          List.fold_left
-                           (fun acc agent ->
-                             let text =
-                               "Dead agent "
-                               ^
-                               if agent.Public_data.agent_ast <> "" then
-                                 agent.Public_data.agent_ast
-                               else
-                                 string_of_int agent.Public_data.agent_id
-                             in
-                             List.fold_left
-                               (fun acc range ->
-                                 {
-                                   Result_util.severity = Logs.Warning;
-                                   Result_util.range = Some range;
-                                   Result_util.text;
-                                 }
-                                 :: acc)
-                               acc agent.Public_data.agent_position)
-                           [] list
-                       in
-                       List.rev warnings)
-                     ~error:(fun mh -> mh)
-               >|= Api_common.result_messages ?result_code:None
-             else
-               Lwt.return (Result_util.ok ()))))
-    State_project.model
+                           (fun acc range ->
+                             {
+                               Result_util.severity = Logs.Warning;
+                               Result_util.range = Some range;
+                               Result_util.text;
+                             }
+                             :: acc)
+                           acc agent.Public_data.agent_position)
+                       [] list
+                   in
+                   List.rev warnings)
+                 ~error:(fun mh -> mh)
+           >|= Api_common.result_messages ?result_code:None
+         else
+           Lwt.return (Result_util.ok ())))
 
 let init_non_weakly_reversible_transitions () =
-  React.S.l1
-    (fun model ->
+  State_project.on_project_change_async ~on:(React.S.const true)
+    (React.S.const ()) (Result_util.ok ()) (fun manager () ->
       State_error.wrap ~append:true "tab_editor_dead_rule"
-        (State_project.eval_with_project ~label:__LOC__
-           (fun (manager : Api.concrete_manager) ->
-             if
-               model.State_project.model_parameters
-                 .State_project.show_non_weakly_reversible_transitions
-             then
-               manager#get_non_weakly_reversible_transitions
-               >|= Result_util.fold
-                     ~ok:(fun list ->
-                       let warnings =
-                         List.fold_left
-                           (fun acc (rule, context_list) ->
-                             if rule.Public_data.rule_hidden then
-                               acc
-                             (* hint: reversible rule are always weakly reversible *)
-                             else (
-                               let plural, skip, tab =
-                                 match context_list with
-                                 | [] | [ _ ] -> "", "", " "
-                                 | _ :: _ -> "s", "\n", "\t"
-                               in
-                               let text =
-                                 Format.asprintf
-                                   "Rule %s may induce non weakly reversible \
-                                    events in the following context%s:%s%a"
-                                   (if rule.Public_data.rule_label <> "" then
-                                      " '" ^ rule.Public_data.rule_label ^ "'"
-                                    else if rule.Public_data.rule_ast <> "" then
-                                      rule.Public_data.rule_ast
-                                    else
-                                      string_of_int rule.Public_data.rule_id)
-                                   plural skip
-                                   (Pp.list
-                                      (fun fmt -> Format.fprintf fmt "%s" skip)
-                                      (fun fmt (a, b) ->
-                                        Format.fprintf fmt "%s%s -> %s " tab a b))
-                                   context_list
-                               in
-                               (* to do, add the potential contexts *)
-                               {
-                                 Result_util.severity = Logs.Warning;
-                                 Result_util.range =
-                                   Some rule.Public_data.rule_position;
-                                 Result_util.text;
-                               }
-                               :: acc
-                             ))
-                           [] list
-                       in
-                       List.rev warnings)
-                     ~error:(fun mh -> mh)
-               >|= Api_common.result_messages ?result_code:None
-             else
-               Lwt.return (Result_util.ok ()))))
-    State_project.model
+        (if
+           (*model.State_project.model_parameters
+                  .State_project.show_non_weakly_reversible_transitions*)
+           true
+         then
+           manager#get_non_weakly_reversible_transitions
+           >|= Result_util.fold
+                 ~ok:(fun list ->
+                   let warnings =
+                     List.fold_left
+                       (fun acc (rule, context_list) ->
+                         if rule.Public_data.rule_hidden then
+                           acc
+                         (* hint: reversible rule are always weakly reversible *)
+                         else (
+                           let plural, skip, tab =
+                             match context_list with
+                             | [] | [ _ ] -> "", "", " "
+                             | _ :: _ -> "s", "\n", "\t"
+                           in
+                           let text =
+                             Format.asprintf
+                               "Rule %s may induce non weakly reversible \
+                                events in the following context%s:%s%a"
+                               (if rule.Public_data.rule_label <> "" then
+                                  " '" ^ rule.Public_data.rule_label ^ "'"
+                                else if rule.Public_data.rule_ast <> "" then
+                                  rule.Public_data.rule_ast
+                                else
+                                  string_of_int rule.Public_data.rule_id)
+                               plural skip
+                               (Pp.list
+                                  (fun fmt -> Format.fprintf fmt "%s" skip)
+                                  (fun fmt (a, b) ->
+                                    Format.fprintf fmt "%s%s -> %s " tab a b))
+                               context_list
+                           in
+                           (* to do, add the potential contexts *)
+                           {
+                             Result_util.severity = Logs.Warning;
+                             Result_util.range =
+                               Some rule.Public_data.rule_position;
+                             Result_util.text;
+                           }
+                           :: acc
+                         ))
+                       [] list
+                   in
+                   List.rev warnings)
+                 ~error:(fun mh -> mh)
+           >|= Api_common.result_messages ?result_code:None
+         else
+           Lwt.return (Result_util.ok ())))
+
+let dont_gc_me = ref []
 
 let onload () =
   let () = Subpanel_editor.onload () in
-  let _ = init_dead_rules () in
-  let _ = init_dead_agents () in
-  let _ = init_non_weakly_reversible_transitions () in
+  let () =
+    dont_gc_me :=
+      [
+        init_dead_rules ();
+        init_dead_agents ();
+        init_non_weakly_reversible_transitions ();
+      ]
+  in
   let () = Tab_contact_map.onload () in
   let () = Tab_influences.onload () in
   let () = Tab_constraints.onload () in

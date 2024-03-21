@@ -316,7 +316,7 @@ let split_counter_variables_into_separate_rules ~warning rules signatures =
   let rec split_for_each_counter_var_value_sites (ids : Mods.StringSet.t)
       (counter_defs : Ast.counter list) :
       Ast.site list -> (Ast.site list * (string * int) list) list = function
-    | [] -> [[],[]]
+    | [] -> [ [], [] ]
     | s :: t ->
       combinations_of_var_setup
         (split_for_each_counter_var_value_sites ids counter_defs t)
@@ -337,7 +337,7 @@ let split_counter_variables_into_separate_rules ~warning rules signatures =
   in
   let rec split_for_each_counter_var_value_mixture (ids : Mods.StringSet.t) :
       Ast.agent list -> (Ast.agent list * (string * int) list) list = function
-    | [] -> [[],[]]
+    | [] -> [ [], [] ]
     | ast_agent :: t ->
       combinations_of_var_setup
         (split_for_each_counter_var_value_mixture ids t)
@@ -434,8 +434,7 @@ let split_counter_variables_into_separate_rules ~warning rules signatures =
 
   List.fold_left
     (fun acc (rule_name, rule_annoted) ->
-        (split_for_each_counter_var_value_rule rule_name rule_annoted)
- @ acc)
+      split_for_each_counter_var_value_rule rule_name rule_annoted @ acc)
     [] rules
   (* TODO: is rev relevant here? *)
   |> List.rev

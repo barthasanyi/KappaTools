@@ -57,7 +57,6 @@ val on_project_change_async :
   ?eq:('a -> 'a -> bool) ->
   on:bool React.signal ->
   ?others_eq:('b -> 'b -> bool) ->
-  'b ->
   'b React.signal ->
   'a ->
   (Api.concrete_manager -> 'b -> 'a Lwt.t) ->

@@ -29,7 +29,7 @@ let contact_map_js : Js_contact.contact_map Js.t =
   Js_contact.create_contact_map display_id State_settings.agent_coloring
 
 let contact_map_text : string React.signal =
-  State_project.on_project_change_async ~on:tab_is_active None accuracy "null"
+  State_project.on_project_change_async ~on:tab_is_active accuracy "null"
     (fun
       (manager : Api.concrete_manager)
       (acc : Public_data.accuracy_level option)

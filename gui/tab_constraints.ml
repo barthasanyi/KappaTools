@@ -22,8 +22,8 @@ let tab_was_active = ref false
 
 let content () =
   let constraints_div =
-    State_project.on_project_change_async ~on:tab_is_active ()
-      (React.S.const ()) [] (fun (manager : Api.concrete_manager) () ->
+    State_project.on_project_change_async ~on:tab_is_active (React.S.const ())
+      [] (fun (manager : Api.concrete_manager) () ->
         manager#get_constraints_list
         >|= Result_util.fold
               ~ok:(fun constraints ->

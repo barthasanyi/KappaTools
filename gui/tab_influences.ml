@@ -190,7 +190,8 @@ let export_config =
             (fun filename ->
               Lwt.ignore_result
                 ( State_error.wrap "influence_map_export"
-                    (State_project.eval_with_project ~label:__LOC__ (fun manager ->
+                    (State_project.eval_with_project ~label:__LOC__
+                       (fun manager ->
                          let { accuracy; _ } = React.S.value model in
                          manager#get_influence_map_raw accuracy
                          >|= Result_util.map (fun influences_string ->
@@ -496,7 +497,7 @@ let draw_table origin_label
     [ Html.tbody outs ]
 
 let influence_sphere =
-  State_project.on_project_change_async ~on:tab_is_active dummy_model model
+  State_project.on_project_change_async ~on:tab_is_active model
     (Result_util.ok empty_sphere)
     (fun manager { rendering; accuracy; origin; origin_label = _ } ->
       match rendering with
