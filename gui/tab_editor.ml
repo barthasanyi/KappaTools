@@ -161,7 +161,7 @@ let init_dead_agents () =
 let init_non_weakly_reversible_transitions () =
   State_project.on_project_change_async ~on:(React.S.const true)
     (React.S.const ()) (Result_util.ok ()) (fun manager () ->
-      State_error.wrap ~append:true "tab_editor_dead_rule"
+      State_error.wrap ~append:true "non_weakly_reversible_transitions"
         (if
            (*model.State_project.model_parameters
                   .State_project.show_non_weakly_reversible_transitions*)
