@@ -15,7 +15,7 @@ SCRIPTSSOURCE = $(wildcard $(MANSCRIPTREP)*.sh)
 SCRIPTSWITNESS = $(SCRIPTSSOURCE:.sh=.witness) $(MANGENREP)version.tex
 MODELS = $(wildcard $(MANKAPPAMODELSREP)*.ka)
 
-RESOURCES_HTML=$(wildcard shared/*.js) $(wildcard viz/*.js) $(wildcard viz/*.css) gui/favicon.ico gui/package.json
+RESOURCES_HTML=$(wildcard gui/shared/*.js) $(wildcard gui/viz/*.js) $(wildcard gui/viz/*.css) gui/favicon.ico gui/package.json
 
 APP_EXT?=cdn
 INDEX_HTML=gui/use-$(APP_EXT).html
