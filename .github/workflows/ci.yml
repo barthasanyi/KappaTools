@@ -127,7 +127,7 @@ jobs:
           path: |
             site
             viz
-      - name: Archive Javascript app
+      - name: Archive linux electron app
         uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -193,7 +193,11 @@ jobs:
 
   webapp-playwright-test:
     needs: [cli-and-doc, webapp-ubuntu]
-    if: github.ref == 'refs/heads/master'
+    # run only on master OR when the PR is _not_ a draft
+    # TODO: improve this?
+    if: |
+      github.ref == 'refs/heads/master' ||
+      github.event.pull_request.draft == false
     timeout-minutes: 75
     runs-on: ubuntu-latest
     steps:
@@ -225,6 +229,15 @@ jobs:
           ' > lighttpd.conf
         lighttpd -f lighttpd.conf -D &
         sleep 10 && curl -i http://127.0.0.1:12345/index.html # test 
+    - name: Download electron app
+      uses: actions/download-artifact@v4
+      with:
+        name: linux
+    - name: Setup electron app
+      run: >-
+        tar xzf Kappapp.tar.gz
+        mkdir -p build
+        mv Kappapp ./build/
     - name: Run Playwright tests
       run: DEBUG=pw:webserver npx playwright test --retries=3 --trace retain-on-first-failure 
     - uses: actions/upload-artifact@v4
