@@ -236,7 +236,7 @@ jobs:
       with:
         name: linux
     - name: Setup electron app
-      run: >-
+      run: |
         tar xzf Kappapp.tar.gz
         mkdir -p build
         mv Kappapp ./build/
