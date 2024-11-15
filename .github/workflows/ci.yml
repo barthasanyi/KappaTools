@@ -240,8 +240,11 @@ jobs:
         tar xzf Kappapp.tar.gz
         mkdir -p build
         mv Kappapp ./build/
+        pwd
+        ls -R
+        ls -R /home/runner/work/
     - name: Run Playwright tests
-      run: DEBUG=pw:webserver npx playwright test --retries=3 --trace retain-on-first-failure 
+      run: DEBUG=pw:browser* npx playwright test --retries=3 --trace retain-on-first-failure --project electron
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
