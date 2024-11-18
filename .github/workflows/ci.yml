@@ -211,7 +211,7 @@ jobs:
       run:  |
         npm ci
         sudo apt-get update
-        sudo apt-get install lighttpd
+        sudo apt-get install lighttpd xvfb
         sudo npm install -D @playwright/test@latest
         npm install --save-dev @types/node @types/yauzl
     - name: Install Playwright Browsers
@@ -243,8 +243,9 @@ jobs:
         pwd
         ls -R
         ls -R /home/runner/work/
+        Xvfb&
     - name: Run Playwright tests
-      run: DEBUG=pw:browser* npx playwright test --retries=3 --trace retain-on-first-failure --project electron
+      run: DEBUG=pw:browser* xvfb-run npx playwright test --retries=3 --trace retain-on-first-failure --project electron
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
