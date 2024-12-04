@@ -32,3 +32,10 @@
    Kappa_grammar
    -open
    Kappa_cli)))
+
+ (executable
+   (name KaSiteVar)
+   (libraries
+      kappa_grammar
+   ))
+
