@@ -682,6 +682,11 @@ let raise_if_modification pos = function
     raise
       (ExceptionDefn.Malformed_Decl ("A modification is forbidden here.", pos))
 
+let raise_state_variable_not_supported pos =
+  raise
+    (ExceptionDefn.Malformed_Decl
+       ("State variables are not supported.", pos))
+
 let raise_several_internal_states pos =
   raise
     (ExceptionDefn.Malformed_Decl

@@ -190,11 +190,13 @@ let annotate_dropped_agent ~warning ~syntax_version ~r_edit_style sigs
 
         let () =
           match p.Ast.port_int with
-          | [] | [ (None, _) ] -> ()
-          | [ (Some va, pos) ] ->
+          | [] | [ (StateWildcard, _) ] -> ()
+          | [ (StateName va, pos) ] ->
             internals.(p_id) <-
               LKappa.I_VAL_ERASED
                 (Signature.num_of_internal_state p_id (va, pos) sign)
+          | [ (StateVar _, pos )] ->
+              LKappa.raise_state_variable_not_supported pos
           | _ :: (_, pos) :: _ -> LKappa.raise_several_internal_states pos
         in
         match p.Ast.port_link with
@@ -300,12 +302,14 @@ let annotate_created_agent ~warning ~syntax_version ~r_edit_style sigs
         let () =
           match p.Ast.port_int with
           | [] -> ()
-          | [ (None, _) ] ->
+          | [ (Ast.StateWildcard, _) ] ->
             LKappa.raise_not_enough_specified ~status:"internal" ~side:"left"
               agent_name port_name
-          | [ (Some va, pos) ] ->
+          | [ (Ast.StateName va, pos) ] ->
             internals.(p_id) <-
               Some (Signature.num_of_internal_state p_id (va, pos) sign)
+          | [ (Ast.StateVar _, pos) ] ->
+              LKappa.raise_state_variable_not_supported pos
           | _ :: (_, pos) :: _ -> LKappa.raise_several_internal_states pos
         in
         match p.Ast.port_link with
@@ -450,12 +454,14 @@ let annotate_edit_agent ~warning ~syntax_version ~is_rule sigs ?contact_map
     in
     let () =
       match p.Ast.port_int, p.Ast.port_int_mod with
-      | ([ (None, _) ] | []), None -> ()
-      | [ (Some va, pos) ], Some va' ->
+      | ([ (Ast.StateWildcard, _) ] | []), None -> ()
+      | [ (Ast.StateName va, pos) ], Some va' ->
         internals.(p_id) <-
           LKappa.I_VAL_CHANGED
             ( Signature.num_of_internal_state p_id (va, pos) sign,
               Signature.num_of_internal_state p_id va' sign )
+      | [ (Ast.StateVar _, pos) ], _ ->
+        LKappa.raise_state_variable_not_supported pos
       | [], Some ((_, pos) as va) ->
         let () =
           if syntax_version = Ast.V3 then
@@ -471,10 +477,10 @@ let annotate_edit_agent ~warning ~syntax_version ~is_rule sigs ?contact_map
         in
         internals.(p_id) <-
           LKappa.I_ANY_CHANGED (Signature.num_of_internal_state p_id va sign)
-      | [ (None, _) ], Some va ->
+      | [ (Ast.StateWildcard, _) ], Some va ->
         internals.(p_id) <-
           LKappa.I_ANY_CHANGED (Signature.num_of_internal_state p_id va sign)
-      | [ (Some va, pos) ], None ->
+      | [ (Ast.StateName va, pos) ], None ->
         let i_id = Signature.num_of_internal_state p_id (va, pos) sign in
         internals.(p_id) <- LKappa.I_VAL_CHANGED (i_id, i_id)
       | _ :: (_, pos) :: _, _ -> LKappa.raise_several_internal_states pos
@@ -715,13 +721,13 @@ let annotate_agent_with_diff ~warning ~syntax_version sigs ?contact_map
         p'.Ast.port_int_mod
     in
     match int1, p'.Ast.port_int with
-    | [], [] | [ (None, _) ], [ (None, _) ] -> ()
-    | [ (Some va, pos) ], [ (Some va', pos') ] ->
+    | [], [] | [ (Ast.StateWildcard, _) ], [ (Ast.StateWildcard, _) ] -> ()
+    | [ (Ast.StateName va, pos) ], [ (Ast.StateName va', pos') ] ->
       internals.(p_id) <-
         LKappa.I_VAL_CHANGED
           ( Signature.num_of_internal_state p_id (va, pos) sign,
             Signature.num_of_internal_state p_id (va', pos') sign )
-    | [], [ (Some va, vapos) ] when syntax_version = Ast.V3 ->
+    | [], [ (Ast.StateName va, vapos) ] when syntax_version = Ast.V3 ->
       let na, pos = p'.Ast.port_name in
       let () =
         warning ~pos (fun f ->
@@ -733,14 +739,16 @@ let annotate_agent_with_diff ~warning ~syntax_version sigs ?contact_map
       internals.(p_id) <-
         LKappa.I_ANY_CHANGED
           (Signature.num_of_internal_state p_id (va, vapos) sign)
-    | [ (None, _) ], [ (Some va, vapos) ] ->
+    | [ (Ast.StateWildcard, _) ], [ (Ast.StateName va, vapos) ] ->
       internals.(p_id) <-
         LKappa.I_ANY_CHANGED
           (Signature.num_of_internal_state p_id (va, vapos) sign)
+    | [(StateVar _, pos)], _ | _ , [(StateVar _, pos)] ->
+      LKappa.raise_state_variable_not_supported pos
     | [], [ _ ] ->
       LKappa.raise_not_enough_specified ~status:"internal" ~side:"left"
         agent_name p'.Ast.port_name
-    | [ _ ], ([ (None, _) ] | []) ->
+    | [ _ ], ([ (StateWildcard, _) ] | []) ->
       LKappa.raise_not_enough_specified ~status:"internal" ~side:"right"
         agent_name p'.Ast.port_name
     | _ :: (_, pos) :: _, _ | _, _ :: (_, pos) :: _ ->
@@ -1673,8 +1681,8 @@ let prepare_agent_sig ~(sites : Counters_info.counter_sig Ast.site list) :
                   NamedDecls.create
                     (Tools.array_map_of_list
                        (function
-                         | Some x, pos -> (x, pos), ()
-                         | None, pos ->
+                         | Ast.StateName x, pos -> (x, pos), ()
+                         | Ast.StateWildcard, pos | Ast.StateVar _, pos->
                            raise
                              (ExceptionDefn.Malformed_Decl
                                 ( "Forbidden internal state inside signature \

@@ -71,6 +71,7 @@ val to_raw_mixture : Signature.s -> rule_mixture -> Raw_mixture.t
 val copy_rule_agent : rule_agent -> rule_agent
 val max_link_id : rule_mixture -> int
 val raise_if_modification : Loc.t -> 'a option -> unit
+val raise_state_variable_not_supported : Loc.t -> 'a
 val raise_several_internal_states : Loc.t -> 'a
 
 val raise_not_enough_specified :

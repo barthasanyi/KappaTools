@@ -27,7 +27,7 @@
 %token SHARP UNDERSCORE PIPE RAR LRAR LAR EMAX TMAX CPUTIME TIME EVENT NULL_EVENT
 %token COLON NEWLINE BACKSLASH SIGNATURE TOKEN INIT OBS PLOT PERT CONFIG APPLY
 %token DELETE INTRO SNAPSHOT STOP FLUX TRACK ASSIGN PRINTF PLOTENTRY SPECIES_OF
-%token DO REPEAT ALARM RUN LET
+%token DO REPEAT ALARM RUN LET QUESTION_MARK
 %token <int> INT
 %token <float> FLOAT
 %token <string> ID LABEL STRING
@@ -88,8 +88,9 @@ link_modif:
   ;
 
 internal_state:
-  | ID { add_pos 1 (Some $1) }
-  | SHARP { add_pos 1 None }
+  | ID { add_pos 1 (Ast.StateName $1) }
+  | QUESTION_MARK ID { add_pos 1 (Ast.StateVar $2)}
+  | SHARP { add_pos 1 Ast.StateWildcard }
   ;
 
 internal_states:
@@ -259,7 +260,7 @@ agent:
       (Ast.Present (($5,rhs_pos 5), $9, modif),pend,an) }
   | ID annoted error
     { raise (ExceptionDefn.Syntax_Error
-               (add_pos 3 ("Malformed agent '"^$1^"'"))) }
+               (add_pos 3 ("Malformed agent3 '"^$1^"'"))) }
   ;
 
 agent_sig:

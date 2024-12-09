@@ -251,7 +251,7 @@ let translate_port is_signature parameters int_set port remanent =
   in
   ( {
       Ckappa_sig.port_name = fst port.Ast.port_name;
-      Ckappa_sig.port_int = List.rev_map fst (List.rev port.Ast.port_int);
+      Ckappa_sig.port_int = List.map Ast.state_to_option (List.rev_map fst (List.rev port.Ast.port_int));
       Ckappa_sig.port_link = lnk;
       Ckappa_sig.port_free = is_free;
     },

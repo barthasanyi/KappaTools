@@ -57,6 +57,7 @@ rule token = parse
   | '|' { PIPE }
   | '.' { DOT }
   | '_' { UNDERSCORE }
+  | '?' { QUESTION_MARK }
   | '+' { PLUS }
   | '*' { MULT }
   | '-' { MINUS }

@@ -11,7 +11,11 @@ type syntax_version = V3 | V4
 
 val merge_version : syntax_version -> syntax_version -> syntax_version
 
-type internal = string option Loc.annoted list
+type state = StateWildcard | StateVar of string | StateName of string
+
+val state_to_option : state -> string option
+
+type internal = state Loc.annoted list
 
 type port = {
   port_name: string Loc.annoted;

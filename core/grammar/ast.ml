@@ -13,8 +13,33 @@ let merge_version a b =
   | V4, _ | _, V4 -> V4
   | V3, V3 -> V3
 
-type internal = string option Loc.annoted list
+type state = StateWildcard | StateVar of string | StateName of string
 
+
+
+type internal = state Loc.annoted list
+
+let state_to_option s = match s with
+  | StateWildcard -> None
+  | StateName n -> Some n
+  | StateVar n -> Some ("?"^n)
+
+let annoted_state_to_option (s,pos) = (state_to_option s,pos)
+
+let option_to_state s = match s with
+| None -> StateWildcard
+| Some n -> 
+    let len = String.length n in    
+      if len >= 2 && n.[0] = '?' then
+        StateVar (String.sub n 1 (len - 1))
+      else
+        StateName n
+
+let annoted_option_to_state (s,pos) = (option_to_state s,pos)
+
+let internal_to_option_list = List.map annoted_state_to_option
+let option_list_to_internal = List.map annoted_option_to_state
+  
 type port = {
   port_name: string Loc.annoted;
   port_int: internal;
@@ -261,8 +286,9 @@ let print_ast_internal mod_i f l =
   if l <> [] || mod_i <> None then
     Format.fprintf f "{%a%a}"
       (Pp.list Pp.space (fun f -> function
-         | Some x, _ -> Format.pp_print_string f x
-         | None, _ -> Format.pp_print_string f "#"))
+         | StateName x, _ -> Format.pp_print_string f x
+         | StateVar x, _ -> Format.fprintf f "?%s" x
+         | StateWildcard, _ -> Format.pp_print_string f "#"))
       l
       (Pp.option ~with_space:false (fun f (i, _) -> Format.fprintf f "/%s" i))
       mod_i
@@ -361,7 +387,7 @@ let port_to_json filenames p =
             ( "state",
               JsonUtil.of_list
                 (Loc.string_option_annoted_to_json ~filenames)
-                p.port_int );
+                (internal_to_option_list p.port_int) );
             "mod", mod_i p.port_int_mod;
           ] );
       ( "port_link",
@@ -391,7 +417,7 @@ let build_port_of_json filenames n i l =
     JsonUtil.to_option
       (Loc.annoted_of_yojson ~filenames (JsonUtil.to_string ?error_msg:None))
   in
-  let port_int, port_int_mod =
+  let port_int', port_int_mod =
     match i with
     | `Assoc [] | `Null -> [], None
     | `Assoc [ ("state", i) ] ->
@@ -402,6 +428,7 @@ let build_port_of_json filenames n i l =
       JsonUtil.to_list (Loc.string_option_annoted_of_json ~filenames) i, mod_i m
     | _ -> raise (Yojson.Basic.Util.Type_error ("Not internal states", i))
   in
+  let port_int = option_list_to_internal port_int' in
   let port_link, port_link_mod =
     match l with
     | `Assoc [] | `Null -> [], None
@@ -819,7 +846,7 @@ let to_dummy_user_site = function
         User_graph.Port
           {
             User_graph.port_links = to_dummy_user_link port_link;
-            User_graph.port_states = to_dummy_user_internal port_int;
+            User_graph.port_states = to_dummy_user_internal (internal_to_option_list port_int);
           };
     }
   | Counter { counter_name; counter_test = _; counter_delta = _ } ->
@@ -1439,7 +1466,7 @@ let modif_of_json filenames f_mix f_var = function
 let merge_internal_mod acc = function
   | None -> acc
   | Some (x, pos) ->
-    let x_op = Some x in
+    let x_op = StateName x in
     if List.exists (fun (x', _) -> x_op = x') acc then
       acc
     else
@@ -1448,10 +1475,9 @@ let merge_internal_mod acc = function
 let merge_internals =
   List.fold_left (fun acc ((x, _) as y) ->
       if
-        x = None
+        x = StateWildcard
         || List.exists
-             (fun (x', _) ->
-               Option_util.equal (fun x x' -> String.compare x x' = 0) x x')
+             (fun (x', _) -> x = x')
              acc
       then
         acc
@@ -1590,7 +1616,7 @@ let split_mixture m =
                               port_int =
                                 (match p.port_int_mod with
                                 | None -> p.port_int
-                                | Some (x, pos) -> [ Some x, pos ]);
+                                | Some (x, pos) -> [ StateName x, pos ]);
                               port_int_mod = None;
                               port_link =
                                 (match p.port_link_mod with
