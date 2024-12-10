@@ -35,9 +35,9 @@
 
  (executable
    (name KaStateVar)
-   (public_name KaStateVar)
+   (public_name KaStateVar)   
    (package kappa-binaries)
-   (libraries
+   (libraries      
       kappa_grammar
    ))
 
