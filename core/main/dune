@@ -34,7 +34,9 @@
    Kappa_cli)))
 
  (executable
-   (name KaSiteVar)
+   (name KaStateVar)
+   (public_name KaStateVar)
+   (package kappa-binaries)
    (libraries
       kappa_grammar
    ))
