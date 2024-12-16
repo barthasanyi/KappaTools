@@ -39,5 +39,7 @@
    (package kappa-binaries)
    (libraries      
       kappa_grammar
-   ))
+   )
+   (preprocess (pps ppx_sexp_conv ppx_compare))
+   )
 
