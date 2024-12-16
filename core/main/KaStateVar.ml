@@ -133,7 +133,7 @@ let state_vars_of_agent agent =
 let state_vars_of_rule rule =
     match rule.rewrite with
     | Edit _ -> raise Unsupported_language_construct
-    | Arrow arrow -> Seq.concat (List.to_seq (List.map state_vars_of_agent (List.concat arrow.lhs)))
+    | Arrow arrow -> Seq.concat (List.to_seq (List.map state_vars_of_agent (List.concat (arrow.lhs @ arrow.rhs))))
   
 let subst_on_rule rule substs =
   let subst_on_state state =
@@ -199,11 +199,14 @@ let expand_parsing_instruction ap_map pi =
             (fun (ix,rule) -> RULE (convert_name name ix,(rule,loc)))
             (Seq.zip (ints 1) (expand_rule ap_map rule))) ;;
                   
-let _ = print_endline "Expanding site variables..." in
+(* let _ = print_endline "Expanding site variables." in
+let _ = print_endline "1. Parsing" in *)
 let lexbuf = Lexing.from_channel stdin in
 let ast = Kappa_grammar.Kparser4.model Kappa_grammar.Klexer4.token lexbuf in
-
+(* let _ = print_endline "2. Gathering list of states for each agent/port from signature." in *)
 let ap_map = create_agent_sig_map ast in
+(* let _ = print_endline "3. Transform AST" in *)
 let transformed_ast = List.concat_map (expand_parsing_instruction ap_map) ast in
+(* let _ = print_endline "4. Pretty printing" in *)
 let cst = Kappa_grammar.Cst.append_to_ast_compil transformed_ast empty_compil in
   print_parsing_compil_kappa Format.std_formatter cst
