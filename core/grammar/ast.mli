@@ -11,7 +11,7 @@ type syntax_version = V3 | V4
 
 val merge_version : syntax_version -> syntax_version -> syntax_version
 
-type state = StateWildcard | StateVar of string | StateName of string
+type state = StateAny | StateVar of string | StateName of string
 
 val state_to_option : state -> string option
 

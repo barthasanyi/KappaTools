@@ -13,21 +13,19 @@ let merge_version a b =
   | V4, _ | _, V4 -> V4
   | V3, V3 -> V3
 
-type state = StateWildcard | StateVar of string | StateName of string
-
-
+type state = StateAny | StateVar of string | StateName of string
 
 type internal = state Loc.annoted list
 
 let state_to_option s = match s with
-  | StateWildcard -> None
+  | StateAny -> None
   | StateName n -> Some n
   | StateVar n -> Some ("?"^n)
 
 let annoted_state_to_option (s,pos) = (state_to_option s,pos)
 
 let option_to_state s = match s with
-| None -> StateWildcard
+| None -> StateAny
 | Some n -> 
     let len = String.length n in    
       if len >= 2 && n.[0] = '?' then
@@ -288,7 +286,7 @@ let print_ast_internal mod_i f l =
       (Pp.list Pp.space (fun f -> function
          | StateName x, _ -> Format.pp_print_string f x
          | StateVar x, _ -> Format.fprintf f "?%s" x
-         | StateWildcard, _ -> Format.pp_print_string f "#"))
+         | StateAny, _ -> Format.pp_print_string f "#"))
       l
       (Pp.option ~with_space:false (fun f (i, _) -> Format.fprintf f "/%s" i))
       mod_i
@@ -1475,7 +1473,7 @@ let merge_internal_mod acc = function
 let merge_internals =
   List.fold_left (fun acc ((x, _) as y) ->
       if
-        x = StateWildcard
+        x = StateAny
         || List.exists
              (fun (x', _) -> x = x')
              acc

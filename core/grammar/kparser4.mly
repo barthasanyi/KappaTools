@@ -90,7 +90,7 @@ link_modif:
 internal_state:
   | ID { add_pos 1 (Ast.StateName $1) }
   | QUESTION_MARK ID { add_pos 1 (Ast.StateVar $2)}
-  | SHARP { add_pos 1 Ast.StateWildcard }
+  | SHARP { add_pos 1 Ast.StateAny }
   ;
 
 internal_states:
