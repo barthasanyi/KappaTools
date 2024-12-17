@@ -3,7 +3,6 @@ open Kappa_grammar.Ast
 
 (* Random helpers and things *)
 
-exception Unsupported_language_construct;;
 exception Internal_error;;
 
 type agent_port = string * string
@@ -101,8 +100,7 @@ let rec collect_agent_sigs parsing_instructions =
 let create_agent_sig_map parsing_instructions =
   collect_agent_sigs parsing_instructions |> list_to_map APMap.empty APMap.update
 
-(* Collect list of state vars for a rule, adding agent/site names. *)
-
+(* Collect state vars for a rule together with its agent/site names. *)
 let states_to_state_vars states =
   List.filter_map  
    (function 
@@ -124,11 +122,63 @@ let state_vars_of_agent agent =
      | Present ((agent_name,_),site_list,_) -> List.concat (List.map (state_vars_of_site agent_name) site_list)
      | Absent _ -> []
 
+let state_vars_of_mixture mixture =  List.concat_map state_vars_of_agent (List.concat mixture)
+
+let rec state_vars_of_expr (expr : (mixture, string) Kappa_terms.Alg_expr.e) =
+  match expr with
+  | STATE_ALG_OP _ | ALG_VAR _| TOKEN_ID _ | CONST _ -> []
+  | BIN_ALG_OP (_ , (expr1,_), (expr2,_)) -> 
+    state_vars_of_expr expr1 @ 
+    state_vars_of_expr expr2
+  | UN_ALG_OP (_, (expr,_)) -> 
+    state_vars_of_expr expr
+  | KAPPA_INSTANCE mix -> state_vars_of_mixture mix    
+  | IF ((b,_),(expr1,_),(expr2,_)) -> 
+    state_vars_of_bool b @
+    state_vars_of_expr expr1 @
+    state_vars_of_expr expr2 
+  | DIFF_TOKEN ((expr,_),_) -> state_vars_of_expr expr
+  | DIFF_KAPPA_INSTANCE ((expr,_),mix) ->
+    state_vars_of_expr expr @
+    state_vars_of_mixture mix
+and state_vars_of_bool b =
+  match b with
+  | TRUE | FALSE -> []      
+  | BIN_BOOL_OP (_ ,(b1,_),(b2,_)) -> state_vars_of_bool b1 @ state_vars_of_bool b2
+  | UN_BOOL_OP (_, (b,_)) -> state_vars_of_bool b
+  | COMPARE_OP (_,(expr1,_),(expr2,_)) -> state_vars_of_expr expr1 @ state_vars_of_expr expr2
+let state_vars_of_token_list tokens =
+  List.concat_map (fun ((token,_),_) -> state_vars_of_expr token) tokens
+
+let state_vars_of_rule_content rule_content =
+    match rule_content with
+    | Edit edit -> 
+      state_vars_of_mixture edit.mix @
+      state_vars_of_token_list edit.delta_token
+    | Arrow arrow ->  
+      state_vars_of_mixture (arrow.lhs @ arrow.rhs) @
+      state_vars_of_token_list (arrow.rm_token @ arrow.add_token)
+
+let state_vars_of_opt_expr opt_expr =
+  match opt_expr with
+  | None -> []
+  | Some (expr,_) -> state_vars_of_expr expr
+
+let state_vars_of_k_un k_un =
+    match k_un with
+    | None -> []
+    | Some ((expr,_),opt_expr) -> 
+      state_vars_of_expr expr @
+      state_vars_of_opt_expr opt_expr
 let state_vars_of_rule rule =
-    match rule.rewrite with
-    | Edit _ -> raise Unsupported_language_construct
-    | Arrow arrow -> List.concat_map state_vars_of_agent (List.concat (arrow.lhs @ arrow.rhs))
-  
+  state_vars_of_rule_content rule.rewrite @
+  state_vars_of_expr (fst rule.k_def) @  
+  state_vars_of_k_un rule.k_un @
+  state_vars_of_opt_expr rule.k_op @
+  state_vars_of_k_un rule.k_op_un
+
+ (* Substitution *)   
+
 let subst_on_rule rule substs =
   let subst_on_state state =
     match state with
@@ -151,18 +201,68 @@ let subst_on_rule rule substs =
     | Absent _ as abs -> abs
     in        
   let subst_on_mixture = List.map (List.map subst_on_agent) in
-  let subst_on_arrow
-        (arrow : arrow_notation) =
-      let () = assert (arrow.rm_token = [] && arrow.add_token = []) in
-      {arrow with 
+  let rec subst_on_expr (expr : (mixture, string) Kappa_terms.Alg_expr.e) =
+    match expr with
+    | STATE_ALG_OP _  | ALG_VAR _| TOKEN_ID _ | CONST _ ->
+      expr
+    | BIN_ALG_OP (op , expr1, expr2) ->
+      BIN_ALG_OP (op, subst_on_expr_loc expr1, subst_on_expr_loc expr2)
+    | UN_ALG_OP (op, expr) ->
+      UN_ALG_OP (op, subst_on_expr_loc expr)
+    | KAPPA_INSTANCE mix ->
+      KAPPA_INSTANCE (subst_on_mixture mix)
+    | IF (b,expr1,expr2) ->
+      IF (subst_on_bool_loc b,subst_on_expr_loc expr1,subst_on_expr_loc expr2)
+    | DIFF_TOKEN (expr,id) ->
+      DIFF_TOKEN (subst_on_expr_loc expr,id)
+    | DIFF_KAPPA_INSTANCE (expr,mix) ->
+      DIFF_KAPPA_INSTANCE (subst_on_expr_loc expr, subst_on_mixture mix)
+  and subst_on_expr_loc (expr,loc) = (subst_on_expr expr,loc)
+  and subst_on_bool (b : (mixture,string) Kappa_terms.Alg_expr.bool) =
+    match b with
+    | TRUE | FALSE ->
+      b
+    | BIN_BOOL_OP (op ,b1,b2) ->
+      BIN_BOOL_OP (op ,subst_on_bool_loc b1,subst_on_bool_loc b2)
+    | UN_BOOL_OP (op, b) ->
+      UN_BOOL_OP (op, subst_on_bool_loc b)
+    | COMPARE_OP (op,expr1,expr2) ->
+      COMPARE_OP (op,subst_on_expr_loc expr1,subst_on_expr_loc expr2) 
+  and subst_on_bool_loc (b,loc) = (subst_on_bool b,loc) in
+  let subst_on_token_list tokens =
+    List.map (fun (expr_loc,id) -> ((subst_on_expr_loc expr_loc),id)) tokens in
+  let subst_on_edit (edit : edit_notation) =
+     {
+      mix = subst_on_mixture edit.mix;
+      delta_token = subst_on_token_list edit.delta_token
+     } in
+  let subst_on_arrow (arrow : arrow_notation) =      
+      {
           lhs = subst_on_mixture arrow.lhs; 
-          rhs = subst_on_mixture arrow.rhs 
+          rm_token = subst_on_token_list arrow.rm_token;
+          rhs = subst_on_mixture arrow.rhs; 
+          add_token = subst_on_token_list arrow.add_token
       } in
   let subst_on_rule_content (rc : rule_content) =
     match rc with
     | Arrow arrow -> Arrow (subst_on_arrow arrow)
-    | Edit _ -> raise Unsupported_language_construct in
-  {rule with rewrite = subst_on_rule_content rule.rewrite}  
+    | Edit edit -> Edit (subst_on_edit edit) in
+  let subst_on_expr_loc_opt expr_opt =
+    match expr_opt with
+    | None -> None
+    | Some expr -> Some (subst_on_expr_loc expr) in
+  let subst_on_k_un k_un =
+    match k_un with
+    | None -> None
+    | Some (expr,expr_opt) -> Some (subst_on_expr_loc expr,subst_on_expr_loc_opt expr_opt) in
+  {
+    rewrite = subst_on_rule_content rule.rewrite;
+    bidirectional = rule.bidirectional;
+    k_def = subst_on_expr_loc rule.k_def;
+    k_un = subst_on_k_un rule.k_un;
+    k_op = subst_on_expr_loc_opt rule.k_op;
+    k_op_un = subst_on_k_un rule.k_op_un
+  }  
 let expand_rule ap_states_map rule =
   let var_aps_map : agent_port list StringMap.t = 
       state_vars_of_rule rule |> list_to_map StringMap.empty StringMap.update in
