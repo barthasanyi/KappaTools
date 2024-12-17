@@ -197,14 +197,17 @@ let expand_parsing_instruction ap_map pi =
             )
             (expand_rule ap_map rule) ;;
                   
-(* let _ = print_endline "Expanding site variables." in
-let _ = print_endline "1. Parsing" in *)
+(* Shell script for expanding site variables. 
+   Reads a kappa file with site variables from stdin.
+   Writes an expanded kappa file without site variables to stdout. *)
+
+(* 1. Parsing *)
 let lexbuf = Lexing.from_channel stdin in
 let ast = Kappa_grammar.Kparser4.model Kappa_grammar.Klexer4.token lexbuf in
-(* let _ = print_endline "2. Gathering list of states for each agent/port from signature." in *)
+(* 2. Gathering list of states for each agent/port from signature. *)
 let ap_map = create_agent_sig_map ast in
-(* let _ = print_endline "3. Transform AST" in *)
+(* 3. Transform AST *)
 let transformed_ast = List.concat_map (expand_parsing_instruction ap_map) ast in
-(* let _ = print_endline "4. Pretty printing" in *)
+(* 4. Pretty printing *)
 let cst = Kappa_grammar.Cst.append_to_ast_compil transformed_ast empty_compil in
   print_parsing_compil_kappa Format.std_formatter cst
