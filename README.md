@@ -1,3 +1,17 @@
+# Kappa extension: state variables
+
+This repository is a clone of [Kappa](https://github.com/Kappa-Dev/KappaTools/).
+
+It contains an extension to the Kappa language: state variables. In rules, where states
+can appear, the extension also allows state variables of the form ?x, where x is an identifier.
+
+
+The semantics is that a state variable can bound to any state as long as the same variables in the rule are bound to the same state. The state variable's scope is always the rule it appears in.
+
+The current prototype implementation is a standalone new executable, KaStateVar. KaStateVar reads an extended kappa source file (with state variables) from the standard input, expands the rules containing state variables into multiple kappa rules that do not contain state variables but instead specify the states explicitely, and prints the resulting kappa file to the standard output. It requires agent signature declarations to enumerate all states.
+
+The rest of this readme is from the original Kappa documentation. Please use the arious Kappa tools from the original repository, as this is an experimental clone that may change them.
+
 <img
 src="https://rawgithub.com/Kappa-Dev/KaSim/master/man/img/KaSim-Logo.svg"
 alt="KaSim logo" title="Stochastic Kappa Simulator" align="right" height="90"/>
